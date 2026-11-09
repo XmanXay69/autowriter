@@ -1,0 +1,27 @@
+AutoWriter self-test: tricky text
+=================================
+
+Plain sentence. Another one, with commas; semicolons: colons! Questions? Yes.
+Straight "double quotes" and 'single quotes' and it's an apostrophe.
+Curly “double” and ‘single’ quotes typed as they are.
+Dashes: - -- --- – — and an ellipsis ... …
+Symbols: @ # $ % ^ & * ( ) _ + = { } [ ] | \ / < > ~ ` € £ ¥ © ® ™ ° ± × ÷
+Numbers: 0123456789 1/2 3.14159 -42 +7 1,000,000
+Tabs:	one	two		three
+Two  spaces  between  words  and three   here.
+lowercase sentence start. another lowercase after a period. i am lowercase i.
+Accents: café naïve résumé Ångström Ünïcödé façade jalapeño
+Combining marks: é ñ ǟ
+Scripts: 日本語 中文 한국어 Ελληνικά Русский עברית
+Emoji: 😀 👍🏽 ❤️ 🇯🇵 👨‍👩‍👧‍👦 🏳️‍🌈 🧑🏻‍💻
+URL https://example.com/path?a=1&b=2 and email someone@example.com
+1. Looks like a numbered list
+2. Second item
+- looks like a bullet
+* star bullet
+# Looks like a heading **not bold** _not italic_
+
+(one blank line above, two blank lines below)
+
+
+Last line, with no line break after it.

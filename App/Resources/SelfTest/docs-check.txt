@@ -1,0 +1,16 @@
+AutoWriter Docs check {id}
+i think "smart quotes" and 'single quotes' stay straight. it's fine.
+lowercase start after a period. another one.
+1. numbered line one
+2. numbered line two
+- dash bullet
+* star bullet
+Links https://example.com and www.example.org stay plain.
+Swaps -- and --- and ... and (c) (tm) -> 1/2 :)
+# not a heading **not bold** _not italic_
+Tab	between	words.
+Emoji 😀 👍🏽 👨‍👩‍👧‍👦 🇯🇵 accents café naïve 日本語 한국어
+Email me@example.com and an @mention in the middle.
+Double  spaces  stay.
+teh adn recieve stay misspelled.
+End of AutoWriter Docs check {id}
