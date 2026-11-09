@@ -124,6 +124,34 @@ enum LaunchOptions {
             try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
             NSApp.terminate(nil)
         }
+        if let path = value("focus-info") {
+            // Where the keyboard focus is inside each Chrome window (read-only, for debugging).
+            var lines: [String] = []
+            for app in NSRunningApplication.runningApplications(withBundleIdentifier: "com.google.Chrome") {
+                let appElement = AXUIElementCreateApplication(app.processIdentifier)
+                AXUIElementSetMessagingTimeout(appElement, 3)
+                // Chrome only describes web pages to apps that ask for it.
+                AXUIElementSetAttributeValue(appElement, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+                try? await Task.sleep(for: .seconds(1))
+                var element = Windows.child(appElement, kAXFocusedUIElementAttribute)
+                lines.append("focused element:")
+                var depth = 0
+                while let current = element, depth < 25 {
+                    var editable: CFTypeRef?
+                    AXUIElementCopyAttributeValue(current, "AXEditable" as CFString, &editable)
+                    let url = Windows.string(current, "AXURL") ?? (Windows.child(current, "AXURL").map { _ in "?" } ?? "")
+                    lines.append("  \(Windows.string(current, kAXRoleAttribute) ?? "?") "
+                                 + "subrole=\(Windows.string(current, kAXSubroleAttribute) ?? "-") "
+                                 + "title=\(Windows.string(current, kAXTitleAttribute)?.prefix(60) ?? "-") "
+                                 + "desc=\(Windows.string(current, kAXDescriptionAttribute)?.prefix(60) ?? "-") "
+                                 + "editable=\((editable as? NSNumber)?.boolValue.description ?? "-") url=\(url.prefix(80))")
+                    element = Windows.child(current, kAXParentAttribute)
+                    depth += 1
+                }
+            }
+            try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+            NSApp.terminate(nil)
+        }
         if let path = value("open") {
             model.open(URL(fileURLWithPath: path))
         }

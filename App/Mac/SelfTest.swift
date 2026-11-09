@@ -93,14 +93,21 @@ enum SelfTest {
             // panels like Calendar, where single letters are shortcuts), so this
             // test never guesses: like real use, you click into the document
             // during the countdown.
-            target = await waitForWindow { $0.kind == .googleDocs }
+            // Opens a brand-new Doc (docs.new) and uses the window in front,
+            // so it can't pick an older "Untitled document" window by mistake.
+            if let chrome = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.Chrome"),
+               let newDoc = URL(string: "https://docs.new") {
+                log("opening docs.new in Chrome")
+                _ = try? await NSWorkspace.shared.open([newDoc], withApplicationAt: chrome, configuration: .init())
+                target = await waitForFrontWindow { $0.kind == .googleDocs }
+            }
 
         case "search":
             sample = "autowriter test café \"quotes\" 😀 1/2 -- done"
             if let chrome = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.Chrome"),
                let google = URL(string: "https://www.google.com") {
                 _ = try? await NSWorkspace.shared.open([google], withApplicationAt: chrome, configuration: .init())
-                target = await waitForWindow { $0.kind == .googleSearch }
+                target = await waitForFrontWindow { $0.kind == .googleSearch }
             }
 
         default:
@@ -198,6 +205,18 @@ enum SelfTest {
             }
             try? await Task.sleep(for: .milliseconds(200))
         }
+        return nil
+    }
+
+    /// Waits (up to 15 seconds) until the window in front matches.
+    private static func waitForFrontWindow(_ matches: (WindowInfo) -> Bool) async -> WindowInfo? {
+        for _ in 0..<75 {
+            if let window = Windows.frontWindow(), matches(window) {
+                return window
+            }
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        log("front window never matched; last: \(Windows.frontWindow()?.label ?? "none")")
         return nil
     }
 
