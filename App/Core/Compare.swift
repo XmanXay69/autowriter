@@ -217,8 +217,8 @@ enum Comparer {
         if expected.contains("-") && (actual.contains("—") || actual.contains("–")) {
             return .dashes
         }
-        if expected != actual && expected.lowercased() == actual.lowercased() {
-            return .capitalization
+        if expected != actual && expected.lowercased() == straightened.lowercased() {
+            return .capitalization  // (maybe with a curly quote too, like "it's" → "It’s")
         }
         if expected.contains("  ") && actual.contains(". ") {
             return .doubleSpacePeriod

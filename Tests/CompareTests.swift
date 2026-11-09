@@ -37,6 +37,11 @@ struct CompareTests {
         #expect(causes.contains(.spelling))
     }
 
+    @Test func capitalAndCurlyQuoteTogether() {
+        let result = Comparer.compare(expected: "ok. it's here", actual: "ok. It’s here")
+        #expect(result.differences.map(\.cause) == [.capitalization])
+    }
+
     @Test func noticesDroppedCharacters() {
         let result = Comparer.compare(expected: "The quick brown fox", actual: "The quck brown fox")
         #expect(result.differences.count == 1)

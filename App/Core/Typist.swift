@@ -170,6 +170,20 @@ final class Typist {
         }
     }
 
+    /// For screenshots of the app: shows a pretend state without typing anything.
+    func debugShow(_ name: String) {
+        guard !state.isRunning else { return }
+        position = characters.count * 2 / 5
+        switch name {
+        case "typing": state = .typing
+        case "paused": state = .paused
+        case "waiting": state = .waiting("Safari is in front instead of Google Chrome")
+        case "countdown": position = 0; state = .countdown(3)
+        case "done": position = characters.count; state = .finished
+        default: position = 0; state = .idle
+        }
+    }
+
     // MARK: - The loop
 
     private func run() async {
