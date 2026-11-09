@@ -218,7 +218,7 @@ struct QuickPanelView: View {
                 Text(error).font(.system(size: 11)).foregroundStyle(Theme.red)
             }
             HStack(spacing: 8) {
-                Button("Open…") { model.showOpenPanel() }
+                Button("Open…") { model.showOpenPanel(attachedTo: model.quickPanel?.window) }
                 Button("Paste") { model.pasteText() }
                 Spacer()
                 if !model.text.isEmpty {

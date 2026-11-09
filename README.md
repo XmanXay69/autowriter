@@ -77,7 +77,9 @@ shortcuts use the same no-permission "hot key" system as Window Watcher's ⌘⇧
 2. Press **⌃⌥⌘T** (Control-Option-Command-T), or click AutoWriter's icon in the
    menu bar (a text cursor). A small panel pops up over that window, and that
    window becomes the target.
-3. Drop a document on the panel, or click **Open…** or **Paste**.
+3. Pick your document. For a new job (nothing loaded, or the last document is
+   done), the file chooser opens right away, attached to the panel. You can
+   also drop a file on the panel, or use **Open…** or **Paste**.
 4. Press **Start** (or **⌃⌥⌘T** again). The panel doesn't take the focus from
    your document, so your cursor stays put; you still get 5 seconds to click
    somewhere else if you like.

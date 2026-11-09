@@ -236,12 +236,29 @@ final class AppModel {
         }
     }
 
-    func showOpenPanel() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = DocumentLoader.supportedExtensions.compactMap { .init(filenameExtension: $0) }
-        panel.message = "Choose a document to type (.txt, .md, .docx or .pdf)"
-        if panel.runModal() == .OK, let url = panel.url {
-            open(url)
+    /// Shows the file chooser. From the pop-up panel it slides down from the
+    /// panel itself, so it opens right where you are, even over a full-screen
+    /// app, instead of wherever the big window happens to be.
+    func showOpenPanel(attachedTo parent: NSWindow? = nil) {
+        guard !isRunning else { return }
+        let picker = NSOpenPanel()
+        picker.allowedContentTypes = DocumentLoader.supportedExtensions.compactMap { .init(filenameExtension: $0) }
+        picker.message = "Choose a document to type (.txt, .md, .docx or .pdf)"
+        guard let parent else {
+            if picker.runModal() == .OK, let url = picker.url {
+                open(url)
+            }
+            return
+        }
+        picker.beginSheetModal(for: parent) { [weak self] response in
+            guard let self else { return }
+            if response == .OK, let url = picker.url {
+                self.open(url)
+            }
+            // Give the focus back to your document, so Start types where your cursor was.
+            if let target = self.lockedWindow {
+                Windows.bringToFront(target)
+            }
         }
     }
 
@@ -337,6 +354,15 @@ final class AppModel {
             lock(front)
         }
         quickPanel?.show(over: isRunning ? runTarget : lockedWindow)
+        // A new job (nothing loaded, or the last document is done): open the
+        // file chooser right away, attached to the panel.
+        let lastJobDone = typist.position >= typist.characters.count  // also true when nothing is loaded
+        if !isRunning && lastJobDone, let panelWindow = quickPanel?.window {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                guard panelWindow.isVisible, panelWindow.attachedSheet == nil else { return }
+                self?.showOpenPanel(attachedTo: panelWindow)
+            }
+        }
         updateWindowLevel()
     }
 
