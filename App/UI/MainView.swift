@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 
 struct MainView: View {
     @Bindable var model: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Group {
@@ -25,6 +26,7 @@ struct MainView: View {
         .background(Theme.background.ignoresSafeArea())
         .foregroundStyle(Theme.text)
         .preferredColorScheme(.dark)
+        .onAppear { model.openMainWindow = { openWindow(id: "main") } }
         .sheet(isPresented: $model.showingWindowPicker) { WindowPickerView(model: model) }
         .sheet(isPresented: $model.showingTips) { TipsView(model: model) }
         .sheet(isPresented: Binding(
@@ -259,7 +261,7 @@ struct MainView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack {
-                Text("⌃⌥⌘T start   ⌃⌥⌘P pause   Esc or ⌘⇧. stop")
+                Text("⌃⌥⌘T pop-up panel, then start   ⌃⌥⌘P pause   Esc or ⌘⇧. stop")
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.secondary)
                 Spacer()

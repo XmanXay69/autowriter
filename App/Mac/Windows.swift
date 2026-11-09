@@ -23,7 +23,10 @@ struct WindowInfo: Identifiable {
     var isMinimized = false   // in the Dock; Start brings it back
 
     var id: String { "\(pid)-\(CFHash(element))" }
-    var label: String { title.isEmpty ? "\(appName) — (no title)" : "\(appName) — \(title)" }
+    var label: String {
+        let shortTitle = TitleMatcher.withoutBrowserName(title)  // no "- Google Chrome - <profile>"
+        return shortTitle.isEmpty ? "\(appName) — (no title)" : "\(appName) — \(shortTitle)"
+    }
     var listLabel: String { isMinimized ? label + "  (minimized)" : label }
     var kind: TargetKind { TargetKind.detect(bundleID: bundleID, title: title) }
 
@@ -111,6 +114,23 @@ enum Windows {
         AXUIElementSetAttributeValue(appElement, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
         AXUIElementSetAttributeValue(window.element, kAXMainAttribute as CFString, kCFBooleanTrue)
         AXUIElementPerformAction(window.element, kAXRaiseAction as CFString)
+    }
+
+    /// Where a window is on screen, in AppKit coordinates (bottom-left origin).
+    static func frame(of window: WindowInfo) -> CGRect? {
+        var positionValue: CFTypeRef?
+        var sizeValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window.element, kAXPositionAttribute as CFString, &positionValue) == .success,
+              AXUIElementCopyAttributeValue(window.element, kAXSizeAttribute as CFString, &sizeValue) == .success,
+              let positionValue, let sizeValue,
+              CFGetTypeID(positionValue) == AXValueGetTypeID(), CFGetTypeID(sizeValue) == AXValueGetTypeID() else { return nil }
+        var position = CGPoint.zero
+        var size = CGSize.zero
+        AXValueGetValue(positionValue as! AXValue, .cgPoint, &position)
+        AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
+        // Accessibility measures from the top of the main screen; AppKit from the bottom.
+        let mainScreenHeight = NSScreen.screens.first?.frame.height ?? 0
+        return CGRect(x: position.x, y: mainScreenHeight - position.y - size.height, width: size.width, height: size.height)
     }
 
     // MARK: - Small helpers for reading Accessibility attributes

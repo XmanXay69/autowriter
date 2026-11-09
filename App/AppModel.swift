@@ -79,6 +79,11 @@ final class AppModel {
 
     /// The main window (so it can float above other windows while typing).
     @ObservationIgnored weak var window: NSWindow?
+    /// The small pop-up panel (UI/QuickPanel.swift) and the menu bar icon.
+    @ObservationIgnored private(set) var quickPanel: QuickPanel?
+    @ObservationIgnored private var menuBarIcon: MenuBarIcon?
+    /// Opens the main window again after it was closed (set by MainView).
+    @ObservationIgnored var openMainWindow: (() -> Void)?
 
     @ObservationIgnored private let keyboard = Keyboard()
     @ObservationIgnored private let defaults = UserDefaults.standard
@@ -111,7 +116,10 @@ final class AppModel {
     /// Starts the once-a-second check of permissions and the front window,
     /// and the Start shortcut. (Separate from init so previews and tests stay quiet.)
     func begin() {
-        HotKeys.shared.register(HotKeys.start) { [weak self] in self?.startOrResume() }
+        guard timer == nil else { return }  // only once, even if the window is reopened
+        quickPanel = QuickPanel(model: self)
+        menuBarIcon = MenuBarIcon(model: self)
+        HotKeys.shared.register(HotKeys.start) { [weak self] in self?.startShortcut() }
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.everySecond() }
         }
@@ -318,6 +326,60 @@ final class AppModel {
 
     // MARK: - Running
 
+    /// Pops up the small panel over the window you're in, and makes that
+    /// window the one to type into.
+    func summonPanel() {
+        guard hasPermission else {
+            showMainWindow()  // the permission screen comes first
+            return
+        }
+        if !isRunning, let front = Windows.frontWindow() {
+            lock(front)
+        }
+        quickPanel?.show(over: isRunning ? runTarget : lockedWindow)
+        updateWindowLevel()
+    }
+
+    func hidePanel() {
+        quickPanel?.hide()
+        updateWindowLevel()
+    }
+
+    func togglePanel() {
+        if quickPanel?.isVisible == true {
+            hidePanel()
+        } else {
+            summonPanel()
+        }
+    }
+
+    /// ⌃⌥⌘T: the first press pops up the panel over the window you're in;
+    /// pressing it again (still in that window) starts typing. While paused, it resumes.
+    func startShortcut() {
+        switch typist.state {
+        case .paused:
+            resume()
+        case .typing, .waiting, .resuming, .countdown:
+            break
+        default:
+            let front = Windows.frontWindow()
+            let sameWindow = front == nil || front!.isSameWindow(as: lockedWindow)
+            if quickPanel?.isVisible == true && sameWindow && canStart {
+                start()
+            } else {
+                summonPanel()
+            }
+        }
+    }
+
+    func showMainWindow() {
+        if window?.isVisible != true {
+            openMainWindow?()
+        }
+        NSApp.activate()
+        window?.makeKeyAndOrderFront(nil)
+    }
+
     func startOrResume() {
         switch typist.state {
         case .paused: resume()
@@ -508,7 +570,9 @@ final class AppModel {
     }
 
     private func updateWindowLevel() {
-        window?.level = (keepOnTop && isRunning) ? .floating : .normal
+        // The pop-up panel already floats; then the big window doesn't need to.
+        let panelShowing = quickPanel?.isVisible == true
+        window?.level = (keepOnTop && isRunning && !panelShowing) ? .floating : .normal
     }
 
     private func sound(_ name: String) {

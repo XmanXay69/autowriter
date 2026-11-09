@@ -8,6 +8,9 @@ keystrokes, exactly as written, so you don't have to type it yourself. It's a
 companion to [Window Watcher](https://github.com/XmanXay69/window-watcher),
 with the same look and the same build setup.
 
+- Press **⌃⌥⌘T** in any window (or click the menu bar icon) and a small
+  **AutoWriter panel pops up over that window**, even a full-screen one. Drop
+  a document on it, press **Start**, done.
 - Load a document by **dropping it** on the window, with **Open…**, or by
   **pasting** text: `.txt`, `.md`, `.docx` (also `.doc`, `.rtf`, `.odt`) and `.pdf`.
   You can edit the preview before typing; AutoWriter types exactly what it shows.
@@ -67,7 +70,24 @@ It does **not** need Screen Recording, because it never looks at your screen; it
 asks macOS for window names instead. It doesn't need Input Monitoring either. Its
 shortcuts use the same no-permission "hot key" system as Window Watcher's ⌘⇧C.
 
-## Using it
+## Quick start: the pop-up panel
+
+1. Click into the document you want to type into (for example your Google Doc),
+   right where the text should go.
+2. Press **⌃⌥⌘T** (Control-Option-Command-T), or click AutoWriter's icon in the
+   menu bar (a text cursor). A small panel pops up over that window, and that
+   window becomes the target.
+3. Drop a document on the panel, or click **Open…** or **Paste**.
+4. Press **Start** (or **⌃⌥⌘T** again). The panel doesn't take the focus from
+   your document, so your cursor stays put; you still get 5 seconds to click
+   somewhere else if you like.
+
+The panel floats above everything while it types, showing progress, Pause and
+Stop. **Open Big Window** gives you the full app: editing the text, tips and
+Check Result. Closing the big window doesn't quit AutoWriter: it stays in the
+menu bar so ⌃⌥⌘T always works. Quit by right-clicking the menu bar icon (or ⌘Q).
+
+## Using the big window
 
 1. Load your text (drop, Open…, or Paste) and fix anything in the preview.
 2. Pick the speed.
@@ -82,7 +102,7 @@ shortcuts use the same no-permission "hot key" system as Window Watcher's ⌘⇧
 
 | Shortcut | Works from any app |
 |---|---|
-| **⌃⌥⌘T** | Start (or resume) |
+| **⌃⌥⌘T** | Pop up the panel over the window you're in; press again to start (or resume) |
 | **⌃⌥⌘P** | Pause / resume |
 | **Esc** or **⌘⇧.** | Stop. It remembers the place, so Start continues from there |
 

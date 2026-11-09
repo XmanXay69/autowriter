@@ -4,7 +4,7 @@
 //
 //  Developer options (used by the scripts, not needed day to day):
 //    --selftest=textedit|docs|search [--wpm=300] [--report=/path.json] [--quit]
-//    --snapshot=/path.png [--demo=typing|paused|waiting|countdown|done] [--sheet=tips|result] [--quit]
+//    --snapshot=/path.png [--demo=typing|paused|waiting|countdown|done] [--sheet=tips|result|panel] [--quit]
 //    --open=/path/to/file
 //    --permission-status=/path.txt   (writes which permission checks pass, then quits)
 //
@@ -53,6 +53,7 @@ struct AutoWriterApp: App {
                 Divider()
                 Button("Choose Window…") { model.showingWindowPicker = true }
                     .disabled(model.isRunning)
+                Button("Show Pop-up Panel   ⌃⌥⌘T") { model.togglePanel() }
                 Button("Check Result") { Task { await model.checkTypedText() } }
                     .disabled(!model.canCheck)
                 Button("Setup Tips…") { model.showingTips = true }
@@ -69,7 +70,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.appearance = NSAppearance(named: .darkAqua)  // always dark, like you asked
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// Closing the big window keeps AutoWriter running (in the menu bar), so
+    /// ⌃⌥⌘T can always pop up the panel. Quit from the menu bar icon or ⌘Q.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 }
 
 /// Hands the SwiftUI window's NSWindow to the app (to style it and make it float while typing).
@@ -94,7 +97,11 @@ enum LaunchOptions {
         CommandLine.arguments.first { $0.hasPrefix("--\(name)=") }.map { String($0.dropFirst(name.count + 3)) }
     }
 
+    private static var handled = false
+
     static func handle(_ model: AppModel) async {
+        guard !handled else { return }  // the window can reopen; options run once
+        handled = true
         if let path = value("permission-status") {
             // Which of macOS's two checks says yes (for figuring out permission problems).
             let status = "accessibility=\(AXIsProcessTrusted()) postEvents=\(CGPreflightPostEventAccess()) "
@@ -167,10 +174,12 @@ enum LaunchOptions {
             switch value("sheet") {
             case "tips": model.showingTips = true
             case "result": model.showDemoResult()
+            case "panel": model.quickPanel?.show(over: nil)
             default: break
             }
             try? await Task.sleep(for: .seconds(1.5))
-            snapshot(model.window?.attachedSheet ?? model.window, to: path)
+            let panel = value("sheet") == "panel" ? model.quickPanel?.window : nil
+            snapshot(panel ?? model.window?.attachedSheet ?? model.window, to: path)
             if CommandLine.arguments.contains("--quit") { NSApp.terminate(nil) }
         }
     }
