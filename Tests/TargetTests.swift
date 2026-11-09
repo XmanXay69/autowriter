@@ -9,18 +9,26 @@ struct TargetTests {
         #expect(TargetKind.detect(bundleID: "com.apple.TextEdit", title: "Untitled") == .textEdit)
         #expect(TargetKind.detect(bundleID: "com.apple.Notes", title: "Notes") == .notes)
         #expect(TargetKind.detect(bundleID: nil, title: "x") == .other)
+        // Chrome adds its name and the profile name to window titles.
+        #expect(TargetKind.detect(bundleID: "com.google.Chrome", title: "Google - Google Chrome - Xavier") == .googleSearch)
+        #expect(TargetKind.detect(bundleID: "com.google.Chrome",
+                                  title: "Untitled document - Google Docs - Google Chrome - Xavier") == .googleDocs)
     }
 
     @Test func titleChangesThatKeepTyping() {
         #expect(TitleMatcher.sameDocument(locked: "Untitled", current: "Untitled — Edited"))
         #expect(TitleMatcher.sameDocument(locked: "Untitled document - Google Docs", current: "My Essay - Google Docs"))
         #expect(TitleMatcher.sameDocument(locked: "Untitled 2", current: "Untitled 2.txt"))
+        #expect(TitleMatcher.sameDocument(locked: "Untitled document - Google Docs - Google Chrome - Xavier",
+                                          current: "Book report - Google Docs - Google Chrome - Xavier"))
     }
 
     @Test func titleChangesThatPause() {
         #expect(!TitleMatcher.sameDocument(locked: "Essay - Google Docs", current: "Inbox (3) - Gmail"))
         #expect(!TitleMatcher.sameDocument(locked: "Notes.txt", current: "Other.txt"))
         #expect(!TitleMatcher.sameDocument(locked: "Google", current: "YouTube"))
+        #expect(!TitleMatcher.sameDocument(locked: "Essay - Google Docs - Google Chrome - Xavier",
+                                           current: "YouTube - Google Chrome - Xavier"))
     }
 
     @Test func speedAndTime() {

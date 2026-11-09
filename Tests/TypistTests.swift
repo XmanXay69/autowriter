@@ -111,10 +111,14 @@ struct TypistTests {
     @Test func waitsWhileModifierKeysAreHeld() async throws {
         let (typist, target) = fastTypist("abc")
         var held = true
-        typist.modifiersHeld = { held }
+        typist.heldModifiers = { held ? "⌘" : nil }
         typist.start()
-        try await Task.sleep(for: .milliseconds(200))
+        try await Task.sleep(for: .milliseconds(900))
         #expect(target.typed.isEmpty)
+        guard case .waiting(let reason) = typist.state, reason.contains("⌘") else {
+            Issue.record("expected the status to say ⌘ is held, got \(typist.state)")
+            return
+        }
         held = false
         await typist.waitUntilDone()
         #expect(target.text == "abc")

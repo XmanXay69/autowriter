@@ -20,9 +20,11 @@ struct WindowInfo: Identifiable {
     let appName: String
     let bundleID: String?
     let title: String
+    var isMinimized = false   // in the Dock; Start brings it back
 
     var id: String { "\(pid)-\(CFHash(element))" }
     var label: String { title.isEmpty ? "\(appName) — (no title)" : "\(appName) — \(title)" }
+    var listLabel: String { isMinimized ? label + "  (minimized)" : label }
     var kind: TargetKind { TargetKind.detect(bundleID: bundleID, title: title) }
 
     func isSameWindow(as other: WindowInfo?) -> Bool {
@@ -47,17 +49,19 @@ enum Windows {
                           bundleID: app.bundleIdentifier, title: string(window, kAXTitleAttribute) ?? "")
     }
 
-    /// Every normal window that's open (not minimized), sorted by app name.
+    /// Every normal window that's open, sorted by app name. Unlike Window
+    /// Watcher (which can't take pictures of them), minimized windows are
+    /// included: AutoWriter brings them back when you press Start.
     static func allWindows() -> [WindowInfo] {
         var windows: [WindowInfo] = []
         for app in NSWorkspace.shared.runningApplications
         where app.activationPolicy == .regular && app.processIdentifier != ownPID {
             for window in children(element(forApp: app.processIdentifier), kAXWindowsAttribute) {
-                guard string(window, kAXSubroleAttribute) == kAXStandardWindowSubrole,
-                      bool(window, kAXMinimizedAttribute) != true else { continue }
+                guard string(window, kAXSubroleAttribute) == kAXStandardWindowSubrole else { continue }
                 windows.append(WindowInfo(element: window, pid: app.processIdentifier,
                                           appName: app.localizedName ?? "App", bundleID: app.bundleIdentifier,
-                                          title: string(window, kAXTitleAttribute) ?? ""))
+                                          title: string(window, kAXTitleAttribute) ?? "",
+                                          isMinimized: bool(window, kAXMinimizedAttribute) == true))
             }
         }
         return windows.sorted { ($0.appName.lowercased(), $0.title.lowercased()) < ($1.appName.lowercased(), $1.title.lowercased()) }
@@ -94,19 +98,29 @@ enum Windows {
 
     /// Brings a window to the front (used when you picked it from the list).
     static func bringToFront(_ window: WindowInfo) {
-        AXUIElementPerformAction(window.element, kAXRaiseAction as CFString)
         if let app = NSRunningApplication(processIdentifier: window.pid) {
             NSApp.yieldActivation(to: app)
             app.activate()
         }
+        // macOS ignores "activate" from an app that isn't in front itself, so
+        // also ask through Accessibility: make the app frontmost and this its main window.
+        let appElement = element(forApp: window.pid)
+        if bool(window.element, kAXMinimizedAttribute) == true {
+            AXUIElementSetAttributeValue(window.element, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+        }
+        AXUIElementSetAttributeValue(appElement, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+        AXUIElementSetAttributeValue(window.element, kAXMainAttribute as CFString, kCFBooleanTrue)
+        AXUIElementPerformAction(window.element, kAXRaiseAction as CFString)
     }
 
     // MARK: - Small helpers for reading Accessibility attributes
 
     static func element(forApp pid: pid_t) -> AXUIElement {
         let app = AXUIElementCreateApplication(pid)
-        // Don't let a frozen app freeze AutoWriter (the default wait is 6 seconds).
-        AXUIElementSetMessagingTimeout(app, 0.5)
+        // Don't let a frozen app freeze AutoWriter (the default wait is 6
+        // seconds), but give Chrome time: the first time an app asks, Chrome
+        // switches on its accessibility support, which can take a moment.
+        AXUIElementSetMessagingTimeout(app, 1.5)
         return app
     }
 

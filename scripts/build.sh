@@ -10,6 +10,17 @@ cd "$(dirname "$0")/.."
 
 VERSION=$(sed -n 's/.*MARKETING_VERSION: "\(.*\)"/\1/p' project.yml)
 APP="dist/AutoWriter.app"
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister
+
+# Extra copies of the app confuse macOS's permission check: the Accessibility
+# switch can end up recorded for a leftover build copy instead of the one in
+# Applications. This makes macOS forget a copy and deletes it.
+forget_copy() {
+    if [ -d "$1" ]; then
+        "$LSREGISTER" -u "$1" 2>/dev/null || true
+        rm -rf "$1"
+    fi
+}
 
 # XcodeGen makes the Xcode project from project.yml; xcodebuild compiles it.
 xcodegen generate --quiet
@@ -21,9 +32,10 @@ if ! xcodebuild -project AutoWriter.xcodeproj -scheme AutoWriter -configuration 
     exit 1
 fi
 grep -E "warning:" build/build.log | grep -v "appintents" | sort -u || true
-rm -rf dist
+forget_copy "$PWD/$APP"
 mkdir -p dist
 ditto build/Build/Products/Release/AutoWriter.app "$APP"
+forget_copy "$PWD/build/Build/Products/Release/AutoWriter.app"
 
 # Sign the app. macOS remembers the Accessibility permission by signature.
 if [ "${1:-}" = "--install" ]; then
@@ -48,6 +60,8 @@ if [ "${1:-}" = "--install" ]; then
     fi
     rm -rf /Applications/AutoWriter.app
     ditto "$APP" /Applications/AutoWriter.app
+    forget_copy "$PWD/$APP"  # only the copy in Applications should exist
+    "$LSREGISTER" -f /Applications/AutoWriter.app
     echo "Installed /Applications/AutoWriter.app ($VERSION)"
     exit 0
 fi

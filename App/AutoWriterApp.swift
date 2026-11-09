@@ -6,6 +6,7 @@
 //    --selftest=textedit|docs|search [--wpm=300] [--report=/path.json] [--quit]
 //    --snapshot=/path.png [--demo=typing|paused|waiting|countdown|done] [--sheet=tips|result] [--quit]
 //    --open=/path/to/file
+//    --permission-status=/path.txt   (writes which permission checks pass, then quits)
 //
 
 import AppKit
@@ -94,6 +95,35 @@ enum LaunchOptions {
     }
 
     static func handle(_ model: AppModel) async {
+        if let path = value("permission-status") {
+            // Which of macOS's two checks says yes (for figuring out permission problems).
+            let status = "accessibility=\(AXIsProcessTrusted()) postEvents=\(CGPreflightPostEventAccess()) "
+                + "path=\(Bundle.main.bundlePath)\n"
+            try? status.write(toFile: path, atomically: true, encoding: .utf8)
+            NSApp.terminate(nil)
+        }
+        if let path = value("list-windows") {
+            // What each app tells Accessibility about its windows (for debugging the window list).
+            var lines: [String] = []
+            for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
+                let element = AXUIElementCreateApplication(app.processIdentifier)
+                AXUIElementSetMessagingTimeout(element, 3)
+                let started = Date()
+                var value: CFTypeRef?
+                let error = AXUIElementCopyAttributeValue(element, kAXWindowsAttribute as CFString, &value)
+                let windows = value as? [AXUIElement] ?? []
+                let titles = windows.map {
+                    "\(Windows.string($0, kAXTitleAttribute) ?? "?") [\(Windows.string($0, kAXSubroleAttribute) ?? "?")"
+                        + " minimized=\(Windows.bool($0, kAXMinimizedAttribute).map(String.init) ?? "?")]"
+                }
+                let focused = Windows.child(element, kAXFocusedWindowAttribute).flatMap { Windows.string($0, kAXTitleAttribute) }
+                lines.append("\(app.localizedName ?? "?") \(app.bundleIdentifier ?? "") error=\(error.rawValue) "
+                             + "took=\(Int(Date().timeIntervalSince(started) * 1000))ms windows=\(titles) focused=\(focused ?? "nil")")
+            }
+            lines.append("allWindows(): " + Windows.allWindows().map(\.label).joined(separator: " | "))
+            try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+            NSApp.terminate(nil)
+        }
         if let path = value("open") {
             model.open(URL(fileURLWithPath: path))
         }

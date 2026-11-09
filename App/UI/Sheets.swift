@@ -24,7 +24,7 @@ struct WindowPickerView: View {
             List(selection: $selection) {
                 ForEach(windows) { window in
                     HStack {
-                        Text(window.label).lineLimit(1).truncationMode(.middle)
+                        Text(window.listLabel).lineLimit(1).truncationMode(.middle)
                         Spacer()
                         if window.kind != .other {
                             Text(window.kind.name)

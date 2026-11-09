@@ -90,8 +90,9 @@ final class Typist {
     @ObservationIgnored var checkTarget: () -> TargetCheck = { .ready }
     /// Called when the countdown ends: picks the window to type into.
     @ObservationIgnored var lockTarget: () -> StartDecision = { .go }
-    /// True while you're holding ⌘, ⌥, ⌃ or ⇧ (typing waits so keys can't combine).
-    @ObservationIgnored var modifiersHeld: () -> Bool = { false }
+    /// The modifier keys you're holding, like "⌘" or "⌃⌥", or nil. Typing
+    /// waits while any are down, so a typed letter can't become a shortcut.
+    @ObservationIgnored var heldModifiers: () -> String? = { nil }
     /// Told about countdown ticks, pauses and so on.
     @ObservationIgnored var onEvent: (Event) -> Void = { _ in }
 
@@ -230,8 +231,8 @@ final class Typist {
                 continue
             }
 
-            if modifiersHeld() {
-                guard await nap(0.05) else { return }
+            if heldModifiers() != nil {
+                guard await waitForModifiersReleased() else { return }
                 nextTime = clock.now
                 continue
             }
@@ -289,6 +290,27 @@ final class Typist {
                 }
             }
         }
+    }
+
+    /// Waits until you let go of ⌘, ⌥, ⌃ and ⇧. A quick press (like a
+    /// shortcut) just waits; if a key stays down, the status says which one.
+    /// Returns false if the run was stopped meanwhile.
+    private func waitForModifiersReleased() async -> Bool {
+        let clock = ContinuousClock()
+        let started = clock.now
+        while let keys = heldModifiers(), !pauseRequested {
+            if clock.now - started > .milliseconds(600) {
+                let reason = "\(keys) is held down. Let go of it to continue (if you're not touching it, press and release \(keys) once)"
+                if state != .waiting(reason) {
+                    state = .waiting(reason)
+                }
+            }
+            guard await nap(0.05) else { return false }
+        }
+        if case .waiting = state, !pauseRequested {
+            state = .typing
+        }
+        return true
     }
 
     /// Sleeps; returns false if the run was stopped meanwhile.

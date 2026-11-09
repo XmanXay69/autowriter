@@ -19,6 +19,7 @@ enum TargetKind: String, Sendable {
 
     static func detect(bundleID: String?, title: String) -> TargetKind {
         let bundleID = bundleID ?? ""
+        let title = TitleMatcher.withoutBrowserName(title)
         if browserBundleIDs.contains(bundleID) {
             if title.contains("Google Docs") { return .googleDocs }
             if title == "Google" || title.hasSuffix("- Google Search") || title.hasSuffix("– Google Search") {
@@ -77,8 +78,14 @@ enum TitleMatcher {
         return false
     }
 
+    /// Chrome-style browsers end window titles with their name and your
+    /// profile: "Essay - Google Docs - Google Chrome - Xavier". Removes that part.
+    static func withoutBrowserName(_ title: String) -> String {
+        title.replacing(/\ [-–—] (Google Chrome|Microsoft Edge|Brave|Opera|Vivaldi|Arc|Chromium)( [-–—] .*)?$/, with: "")
+    }
+
     static func normalized(_ title: String) -> String {
-        var title = title.trimmingCharacters(in: .whitespaces)
+        var title = withoutBrowserName(title).trimmingCharacters(in: .whitespaces)
         for suffix in [" — Edited", " - Edited", " – Edited", " (Edited)", " — Locked", " — Saving…"] {
             if title.hasSuffix(suffix) {
                 title.removeLast(suffix.count)

@@ -32,9 +32,34 @@ enum SelfTest {
         var problem: String?
     }
 
+    /// Each step is written to "<report>.log" as it happens, to see where a test got stuck.
+    private static var logPath = ""
+    private static func log(_ step: String) {
+        let line = Date().formatted(.dateTime.hour().minute().second()) + "  " + step + "\n"
+        if let handle = FileHandle(forWritingAtPath: logPath) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? line.write(toFile: logPath, atomically: true, encoding: .utf8)
+        }
+    }
+
     static func run(_ test: String, model: AppModel, wpm: Double, reportPath: String) async {
+        logPath = reportPath + ".log"
+        try? FileManager.default.removeItem(atPath: logPath)
         var report = Report(test: test, wpm: wpm)
         defer { write(report, to: reportPath) }
+        // If anything hangs, still write what we know and quit after 5 minutes.
+        Task {
+            try? await Task.sleep(for: .seconds(300))
+            log("watchdog: still not done after 5 minutes, giving up")
+            var stuck = Report(test: test, wpm: wpm)
+            stuck.problem = "The test got stuck. See \(logPath)."
+            write(stuck, to: reportPath)
+            NSApp.terminate(nil)
+        }
+        log("start \(test) at \(Int(wpm)) WPM, permission: \(Permissions.hasAccessibility)")
         guard Permissions.hasAccessibility else {
             report.problem = "AutoWriter doesn't have the Accessibility permission yet."
             return
@@ -48,38 +73,34 @@ enum SelfTest {
         switch test {
         case "textedit":
             sample = resource("tricky")
-            let file = FileManager.default.temporaryDirectory.appendingPathComponent("AutoWriter self-test.txt")
+            // A new file each run, so TextEdit never reuses a document from an earlier run.
+            let number = Int(Date().timeIntervalSince1970) % 100_000
+            let file = FileManager.default.temporaryDirectory.appendingPathComponent("AutoWriter self-test \(number).txt")
             try? "".write(to: file, atomically: true, encoding: .utf8)
             savedFile = file
             guard let textEdit = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.TextEdit") else {
                 report.problem = "TextEdit isn't installed."
                 return
             }
+            log("opening \(file.lastPathComponent) in TextEdit")
             _ = try? await NSWorkspace.shared.open([file], withApplicationAt: textEdit, configuration: .init())
-            target = await waitForWindow { $0.bundleID == "com.apple.TextEdit" && $0.title.hasPrefix("AutoWriter self-test") }
+            log("TextEdit opened; looking for its window")
+            target = await waitForWindow { $0.bundleID == "com.apple.TextEdit" && $0.title.hasPrefix(file.lastPathComponent) }
 
         case "docs":
             sample = resource("docs-check").replacingOccurrences(of: "{id}", with: stamp)
-            target = Windows.allWindows().first { $0.kind == .googleDocs }
-            if let target {
-                // Go to the end of the document and start a new paragraph, so the
-                // check doesn't land in the middle of anything already there.
-                Windows.bringToFront(target)
-                try? await Task.sleep(for: .seconds(1.5))
-                if Windows.check(target) == .ready {
-                    keyboard.pressKey(CGKeyCode(kVK_DownArrow), flags: .maskCommand)
-                    try? await Task.sleep(for: .milliseconds(300))
-                    keyboard.send(.returnKey)
-                }
-            }
+            // A web page can have its focus anywhere (Google Docs has side
+            // panels like Calendar, where single letters are shortcuts), so this
+            // test never guesses: like real use, you click into the document
+            // during the countdown.
+            target = await waitForWindow { $0.kind == .googleDocs }
 
         case "search":
             sample = "autowriter test café \"quotes\" 😀 1/2 -- done"
             if let chrome = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.google.Chrome"),
                let google = URL(string: "https://www.google.com") {
                 _ = try? await NSWorkspace.shared.open([google], withApplicationAt: chrome, configuration: .init())
-                target = await waitForWindow { $0.bundleID == "com.google.Chrome" && $0.title == "Google" }
-                try? await Task.sleep(for: .seconds(1))
+                target = await waitForWindow { $0.kind == .googleSearch }
             }
 
         default:
@@ -89,8 +110,10 @@ enum SelfTest {
 
         guard let target else {
             report.problem = "Couldn't find the window to type into for the \(test) test."
+            log("no target window. Windows I can see: " + Windows.allWindows().map(\.label).joined(separator: " | "))
             return
         }
+        log("target: \(target.label)")
 
         model.lock(target)
         model.mode = test == "search" ? .search : .document
@@ -98,14 +121,35 @@ enum SelfTest {
         model.text = sample
         model.startOver()
         model.wpm = wpm
-        model.typist.countdownSeconds = 0
+        // TextEdit's new document has its cursor ready. Web pages need you to
+        // click where the text goes, so they get the normal countdown (longer).
+        model.typist.countdownSeconds = test == "textedit" ? 0 : 8
         defer { model.typist.countdownSeconds = AppModel.countdownSeconds }
+        if test != "textedit" {
+            log("countdown: click into the \(target.kind.name) text where it should type")
+        }
 
         let started = Date()
+        let timeLimit = max(60, Double(sample.count) / Speed.charactersPerSecond(wpm: wpm) * 3 + 30)
         model.start()
+        log("started, state \(model.typist.state)")
+        var lastState = model.typist.state
         while model.typist.state.isRunning {
-            if case .waiting(let reason) = model.typist.state, report.autoPauses.last != reason {
+            if model.typist.state != lastState {
+                lastState = model.typist.state
+                if case .resuming = lastState {} else { log("state \(lastState), \(model.typist.position) typed") }
+            }
+            if case .waiting(let reason) = model.typist.state {
+                // A test never fights you for the keyboard: if the window
+                // loses focus, it stops instead of bringing the window back.
                 report.autoPauses.append(reason)
+                model.stop()
+                report.problem = "Stopped because the window lost focus: \(reason)."
+                log("stopped: \(reason)")
+            }
+            if Date().timeIntervalSince(started) > timeLimit {
+                model.stop()
+                report.problem = "Gave up after \(Int(timeLimit)) seconds."
             }
             try? await Task.sleep(for: .milliseconds(50))
         }
@@ -114,8 +158,10 @@ enum SelfTest {
         report.finished = model.typist.state == .finished
         report.stopMessage = model.typist.stopMessage
 
+        log("typing ended: \(model.typist.state), \(report.characters) characters in \(Int(report.seconds)) s")
         try? await Task.sleep(for: .milliseconds(800))
         await model.checkTypedText()
+        log("check done: \(model.checkResult.map { $0.isMatch ? "match" : "\($0.differences.count) differences" } ?? (model.checkMessage ?? "no result"))")
         if let result = model.checkResult {
             report.match = result.isMatch
             report.hadOtherText = result.hadOtherText

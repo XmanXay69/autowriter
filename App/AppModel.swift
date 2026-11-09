@@ -182,6 +182,7 @@ final class AppModel {
             return "Paused. Press Resume (or ⌃⌥⌘P) to continue."
         case .waiting(let reason):
             if reason.contains("screen is locked") { return "Paused: \(reason). Unlock it and it continues." }
+            if reason.contains("held down") { return "Waiting: \(reason)." }
             return "Paused: \(reason). Click back into \(targetName) to continue."
         case .resuming(let seconds):
             return "Back in \(targetName). Continuing in \(seconds)… Click where it should continue."
@@ -371,7 +372,7 @@ final class AppModel {
 
     private func connectTypist() {
         typist.send = { [keyboard] keystroke in keyboard.send(keystroke) }
-        typist.modifiersHeld = { Keyboard.modifiersHeld }
+        typist.heldModifiers = { Keyboard.heldModifiers }
         typist.lockTarget = { [weak self] in self?.lockTargetForRun() ?? .cancel("AutoWriter closed.") }
         typist.checkTarget = { [weak self] in self?.checkRunTarget() ?? .notReady("AutoWriter closed") }
         typist.onEvent = { [weak self] event in self?.handle(event) }

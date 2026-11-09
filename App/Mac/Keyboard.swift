@@ -21,10 +21,15 @@ final class Keyboard {
         }
     }
 
-    /// True while you're holding ⌘, ⌥, ⌃ or ⇧ on your real keyboard.
-    static var modifiersHeld: Bool {
-        !CGEventSource.flagsState(.hidSystemState)
-            .intersection([.maskCommand, .maskAlternate, .maskControl, .maskShift]).isEmpty
+    /// The modifier keys held on your real keyboard, like "⌘" or "⌃⌥", or nil.
+    static var heldModifiers: String? {
+        let flags = CGEventSource.flagsState(.hidSystemState)
+        var keys = ""
+        if flags.contains(.maskControl) { keys += "⌃" }
+        if flags.contains(.maskAlternate) { keys += "⌥" }
+        if flags.contains(.maskShift) { keys += "⇧" }
+        if flags.contains(.maskCommand) { keys += "⌘" }
+        return keys.isEmpty ? nil : keys
     }
 
     /// Presses a shortcut like ⌘A. Returns false if no key on your keyboard
