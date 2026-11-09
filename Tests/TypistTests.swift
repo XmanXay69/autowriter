@@ -124,6 +124,21 @@ struct TypistTests {
         #expect(target.text == "abc")
     }
 
+    @Test func closesDocsPopupsBeforeReturnAndTab() async {
+        let (typist, target) = fastTypist("hi @sam\nplain\nx\ty")
+        typist.closePopupsFirst = true
+        typist.start()
+        await typist.waitUntilDone()
+        #expect(target.text == "hi @sam⎋\nplain\nx⎋\ty")
+    }
+
+    @Test func noEscapeWhenNotTypingIntoDocs() async {
+        let (typist, target) = fastTypist("hi @sam\nx\ty")
+        typist.start()
+        await typist.waitUntilDone()
+        #expect(target.text == "hi @sam\nx\ty")
+    }
+
     @Test func keepsASteadySpeed() async {
         let (typist, _) = fastTypist(String(repeating: "a", count: 40))
         typist.charactersPerSecond = 100

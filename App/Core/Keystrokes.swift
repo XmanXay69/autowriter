@@ -19,12 +19,14 @@ enum Keystroke: Equatable, Sendable {
     case text(String)   // characters to type, like "a", "é" or "👍🏽"
     case returnKey      // a new line / new paragraph
     case tabKey
+    case escapeKey      // closes a pop-up menu (see Typist.closePopupsFirst)
 }
 
 enum Keystrokes {
     // macOS key codes for the physical Return and Tab keys (the same on every keyboard layout).
     static let returnKeyCode: CGKeyCode = 36
     static let tabKeyCode: CGKeyCode = 48
+    static let escapeKeyCode: CGKeyCode = 53
 
     /// Apple's limit: one keyboard event can carry at most 20 "UTF-16 units"
     /// of text. Almost every character fits in 1 or 2; only long emoji
@@ -44,6 +46,20 @@ enum Keystrokes {
                 return [.text(string)]
             }
             return chunks(of: string).map { .text($0) }
+        }
+    }
+
+    /// Google Docs opens pop-up menus while you type: "@" starts a people
+    /// and files menu, ":" can start an emoji menu, and Smart Compose offers
+    /// gray suggestions. While one is open, Return or Tab picks an item
+    /// instead of starting a new line. So before a Return on a line that has
+    /// "@" or ":" (and before every Tab), an Esc closes any open pop-up first.
+    /// (Esc does nothing in Docs when no menu is open.)
+    static func needsEscapeFirst(_ character: Character, lineSoFar: some Collection<Character>) -> Bool {
+        switch character {
+        case "\t": return true
+        case "\n", "\r\n", "\r": return lineSoFar.contains("@") || lineSoFar.contains(":")
+        default: return false
         }
     }
 
@@ -76,6 +92,8 @@ enum Keystrokes {
             keyCode = returnKeyCode
         case .tabKey:
             keyCode = tabKeyCode
+        case .escapeKey:
+            keyCode = escapeKeyCode
         case .text(let string):
             keyCode = 0  // the key itself doesn't matter: the text we attach is what gets typed
             text = Array(string.utf16)

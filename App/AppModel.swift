@@ -91,6 +91,8 @@ final class AppModel {
     @ObservationIgnored private var savedPosition = -1
     @ObservationIgnored private var saveTextWork: DispatchWorkItem?
     @ObservationIgnored private var isDemo = false
+    /// AutoWriter's own Esc presses (closing Docs pop-ups) must not stop the run.
+    @ObservationIgnored private var ownEscapeUntil = Date.distantPast
 
     static let countdownSeconds = 5
 
@@ -371,11 +373,33 @@ final class AppModel {
     }
 
     private func connectTypist() {
-        typist.send = { [keyboard] keystroke in keyboard.send(keystroke) }
+        typist.send = { [weak self] keystroke in self?.press(keystroke) }
         typist.heldModifiers = { Keyboard.heldModifiers }
         typist.lockTarget = { [weak self] in self?.lockTargetForRun() ?? .cancel("AutoWriter closed.") }
         typist.checkTarget = { [weak self] in self?.checkRunTarget() ?? .notReady("AutoWriter closed") }
         typist.onEvent = { [weak self] event in self?.handle(event) }
+    }
+
+    /// Presses one key in the target window. AutoWriter's own Esc (which
+    /// closes Google Docs pop-ups) briefly lets go of the Esc stop shortcut,
+    /// so it doesn't stop itself.
+    private func press(_ keystroke: Keystroke) {
+        guard keystroke == .escapeKey else {
+            keyboard.send(keystroke)
+            return
+        }
+        let escapeWasOn = HotKeys.shared.isRegistered(HotKeys.escape)
+        HotKeys.shared.unregister(HotKeys.escape)
+        ownEscapeUntil = Date().addingTimeInterval(0.4)
+        keyboard.send(.escapeKey)
+        if escapeWasOn {
+            // Turn the shortcut back on once macOS has delivered our Esc.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                if self?.typist.state == .typing {
+                    self?.registerEscape()
+                }
+            }
+        }
     }
 
     /// End of the countdown: type into the locked window, or else into
@@ -383,13 +407,13 @@ final class AppModel {
     private func lockTargetForRun() -> StartDecision {
         if let locked = lockedWindow {
             runTarget = locked
-            return .go
-        }
-        guard let front = Windows.frontWindow() else {
+        } else if let front = Windows.frontWindow() {
+            runTarget = front
+            lastWindow = front
+        } else {
             return .cancel("Nothing was typed: you didn't click into another window. Press Start, then click where the text should go.")
         }
-        runTarget = front
-        lastWindow = front
+        typist.closePopupsFirst = runTarget?.kind == .googleDocs
         return .go
     }
 
@@ -474,7 +498,10 @@ final class AppModel {
         if !HotKeys.shared.register(HotKeys.escape, action: { [weak self] in self?.stop() }), escapeMonitor == nil {
             escapeMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 if event.keyCode == 53 {
-                    MainActor.assumeIsolated { self?.stop() }
+                    MainActor.assumeIsolated {
+                        guard let self, Date() > self.ownEscapeUntil else { return }
+                        self.stop()
+                    }
                 }
             }
         }

@@ -8,6 +8,7 @@ func typedText(_ keystrokes: [Keystroke]) -> String {
         case .text(let text): return text
         case .returnKey: return "\n"
         case .tabKey: return "\t"
+        case .escapeKey: return "⎋"
         }
     }.joined()
 }
@@ -43,6 +44,15 @@ struct KeystrokeTests {
         let text = try String(contentsOf: url, encoding: .utf8)
         let keystrokes = Array(text).flatMap(Keystrokes.plan(for:))
         #expect(typedText(keystrokes) == text)
+    }
+
+    @Test func escapeBeforeReturnOnlyWhenAPopupMightBeOpen() {
+        #expect(Keystrokes.needsEscapeFirst("\n", lineSoFar: Array("Ask @sam about it")))
+        #expect(Keystrokes.needsEscapeFirst("\n", lineSoFar: Array("Smile :)")))
+        #expect(!Keystrokes.needsEscapeFirst("\n", lineSoFar: Array("A plain line.")))
+        #expect(Keystrokes.needsEscapeFirst("\t", lineSoFar: Array("")))
+        #expect(!Keystrokes.needsEscapeFirst("a", lineSoFar: Array("@")))
+        #expect(Keystrokes.events(for: .escapeKey, source: nil).first?.getIntegerValueField(.keyboardEventKeycode) == 53)
     }
 
     @Test func eventsCarryTheExactTextAndNoModifiers() {

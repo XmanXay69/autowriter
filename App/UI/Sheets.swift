@@ -162,7 +162,8 @@ struct TipsView: View {
                 "Click **OK**",
             ])
             tipBox(title: "Good to know", lines: [
-                "Typing **@** at the start of a word opens Docs' insert menu. AutoWriter types right through it, but check those spots afterwards.",
+                "Click into the **page itself** during the countdown. Docs' side panels (Calendar, Keep, Tasks) can hold the keyboard even when hidden, and letters typed there act as shortcuts.",
+                "Docs opens pop-up menus as you type (**@** for people and files, **:** for emoji). AutoWriter presses Esc to close them before each new line, so they can't swallow your text.",
                 "If Check Result finds missing letters, lower the speed a little. Docs can fall behind on very long documents.",
                 "Docs stays in its own Chrome tab: if you switch tabs, AutoWriter pauses until you switch back.",
             ])

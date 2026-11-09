@@ -123,8 +123,14 @@ became curly quotes", "Letters were capitalized"…), with the setting that fixe
 Also good to know:
 - AutoWriter presses the real **Return** key for new lines and **Tab** for tabs.
   Emoji, accents and other alphabets are typed whole (😀, 👨‍👩‍👧‍👦, café, 日本語).
-- Typing `@` at the start of a word opens Docs' insert menu. AutoWriter keeps
-  typing, but check those spots afterwards.
+- During the countdown, click into the **page itself**. Docs' side panels
+  (Calendar, Keep, Tasks) can hold the keyboard even while hidden, and letters
+  typed there act as shortcuts. AutoWriter checks the window and tab, but it
+  can't see which part of a web page has the cursor.
+- Docs opens pop-up menus as you type: `@` for people and files, `:` for emoji,
+  and gray Smart Compose suggestions. While one is open, Return or Tab would pick
+  from it, so when typing into Google Docs, AutoWriter presses Esc to close any
+  pop-up before each Return on a line with `@` or `:`, and before every Tab.
 - If Check Result finds missing letters, lower the speed.
 
 ## Google Search
@@ -206,6 +212,18 @@ and prints a report. `scripts/selftest.sh docs` does the same at the end of the
 Google Doc that's open in your browser. `scripts/selftest.sh search` types a
 search on google.com in Chrome. Add a speed, like `scripts/selftest.sh docs 600`.
 Hands off the keyboard and mouse while it runs.
+
+## Tested
+
+On macOS 27 with Chrome 155, at 300 WPM:
+- **TextEdit:** a 1,015-character sample with emoji, quotes, tabs, accents and
+  five alphabets came out exactly, except for what macOS's typing helpers changed
+  (turn them off as above).
+- **Google Docs:** a 571-character check came out exactly, except for what
+  Docs' own settings changed (turn them off as above).
+- **Google Search:** a search with quotes, emoji and accents came out exactly.
+
+Not tested yet: Pages, Notes, Microsoft Word, and very long documents.
 
 ## License
 

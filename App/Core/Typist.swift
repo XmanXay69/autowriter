@@ -82,6 +82,9 @@ final class Typist {
     var resumeSeconds = 3
     /// The (shorter) countdown when you resume after pausing yourself.
     var resumeAfterPauseSeconds = 1
+    /// For Google Docs: press Esc to close pop-up menus before Return and Tab
+    /// (see Keystrokes.needsEscapeFirst). Set by the app when the run starts.
+    var closePopupsFirst = false
 
     // --- Hooks the app plugs in (the tests plug in pretend versions) ---
     /// Presses one key in the target window.
@@ -237,7 +240,12 @@ final class Typist {
                 continue
             }
 
-            for keystroke in Keystrokes.plan(for: characters[position]) {
+            let character = characters[position]
+            if closePopupsFirst && Keystrokes.needsEscapeFirst(character, lineSoFar: currentLine()) {
+                send(.escapeKey)
+                guard await nap(0.08) else { return }  // give the menu a moment to close
+            }
+            for keystroke in Keystrokes.plan(for: character) {
                 send(keystroke)
             }
             position += 1
@@ -290,6 +298,15 @@ final class Typist {
                 }
             }
         }
+    }
+
+    /// The characters already typed on the current line.
+    private func currentLine() -> ArraySlice<Character> {
+        var start = position
+        while start > 0 && !characters[start - 1].isNewline {
+            start -= 1
+        }
+        return characters[start..<position]
     }
 
     /// Waits until you let go of ⌘, ⌥, ⌃ and ⇧. A quick press (like a
