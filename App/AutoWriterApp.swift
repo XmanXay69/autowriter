@@ -159,6 +159,22 @@ enum LaunchOptions {
             try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
             NSApp.terminate(nil)
         }
+        if let seconds = value("stress-panel").flatMap(Double.init) {
+            // Flips the pop-up panel between its states quickly, so its height
+            // keeps changing (for finding layout crashes). Writes "survived" if it lives.
+            model.showDemo("idle")
+            model.quickPanel?.show(over: nil)
+            let states = ["typing", "idle", "waiting", "done", "paused", "countdown"]
+            let started = Date()
+            var step = 0
+            while Date().timeIntervalSince(started) < seconds {
+                model.showDemo(states[step % states.count])
+                step += 1
+                try? await Task.sleep(for: .milliseconds(30))
+            }
+            print("survived \(step) state changes")
+            NSApp.terminate(nil)
+        }
         if let path = value("open") {
             model.open(URL(fileURLWithPath: path))
         }

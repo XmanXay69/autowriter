@@ -35,11 +35,35 @@ final class QuickPanel {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.appearance = NSAppearance(named: .darkAqua)
-        let host = NSHostingController(rootView: QuickPanelView(model: model) { [weak model] in model?.hidePanel() })
-        host.sizingOptions = .preferredContentSize  // the panel fits its contents
-        panel.contentViewController = host
+        // AutoWriter sizes the panel itself. Letting SwiftUI resize the window
+        // to fit its contents crashed the app: while typing, the contents change
+        // height often, and SwiftUI's resize ran in the middle of a layout pass
+        // until the app ran out of stack ("excessive recursion").
+        var reportHeight: (CGFloat) -> Void = { _ in }
+        let host = NSHostingView(rootView: QuickPanelView(
+            model: model,
+            close: { [weak model] in model?.hidePanel() },
+            heightChanged: { reportHeight($0) }))
+        host.sizingOptions = []
+        panel.contentView = host
         panel.onCancel = { [weak self] in
             if self?.model.isRunning == false { self?.hide() }
+        }
+        reportHeight = { [weak self] height in self?.fit(height: height) }
+    }
+
+    /// Makes the panel as tall as its contents, keeping its top edge where it
+    /// is. It waits until SwiftUI has finished laying out (async), never animates,
+    /// and ignores tiny changes, so resizing can't feed back into the layout.
+    private func fit(height: CGFloat) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let height = height.rounded(.up)
+            var frame = self.panel.frame
+            guard height > 0, abs(frame.height - height) > 0.5 else { return }
+            frame.origin.y += frame.height - height
+            frame.size.height = height
+            self.panel.setFrame(frame, display: true, animate: false)
         }
     }
 
@@ -85,8 +109,19 @@ final class FloatingPanel: NSPanel {
 struct QuickPanelView: View {
     @Bindable var model: AppModel
     var close: () -> Void
+    /// Tells the panel how tall the card wants to be (see QuickPanel.fit).
+    var heightChanged: (CGFloat) -> Void = { _ in }
 
     var body: some View {
+        card
+            // The card takes its natural height whatever the panel's size is,
+            // so resizing the panel never changes the height it reports.
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { heightChanged($0) }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 11) {
             HStack(spacing: 10) {
                 Button(action: close) {

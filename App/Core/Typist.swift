@@ -176,7 +176,7 @@ final class Typist {
 
     /// For screenshots of the app: shows a pretend state without typing anything.
     func debugShow(_ name: String) {
-        guard !state.isRunning else { return }
+        guard task == nil else { return }  // never during a real run
         position = characters.count * 2 / 5
         switch name {
         case "typing": state = .typing
